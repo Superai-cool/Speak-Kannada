@@ -1,13 +1,10 @@
-from flask import Flask, render_template, request, redirect, session, url_for
-from openai_handler import get_kannada_response
+from flask import Flask, render_template, request, redirect, url_for, session
 from firebase_config import db
+from openai_handler import get_kannada_response
 import os
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "supersecretkey")
-
-# Your admin mobile number
-ADMIN_MOBILE = "8830720742"
 
 @app.route("/")
 def home():
@@ -18,74 +15,50 @@ def login():
     if request.method == "POST":
         mobile = request.form["mobile"]
         password = request.form["password"]
-
         user_data = db.reference(f"users/{mobile}").get()
         if user_data and user_data.get("password") == password:
             session["user"] = user_data["name"]
             session["mobile"] = mobile
-            return redirect(url_for("dashboard"))
+            return redirect("/dashboard")
         else:
-            return "Invalid mobile number or password"
+            return render_template("login.html", error="Invalid login credentials.")
     return render_template("login.html")
 
 @app.route("/dashboard")
 def dashboard():
     if "user" not in session:
         return redirect(url_for("login"))
-    return render_template("dashboard.html", name=session["user"])
+    mobile = session.get("mobile")
+    user_data = db.reference(f"users/{mobile}").get()
+    credit = user_data.get("credit", 0)
+    return render_template("dashboard.html", name=session["user"], credit=credit)
 
 @app.route("/ask", methods=["POST"])
 def ask():
     if "user" not in session:
-        return redirect(url_for("login"))
-    user_input = request.form["message"]
-    response = get_kannada_response(user_input)
+        return "Session expired. Please log in again."
+    
+    message = request.form["message"]
+    mobile = session.get("mobile")
+    user_ref = db.reference(f"users/{mobile}")
+    user_data = user_ref.get()
+    credit = user_data.get("credit", 0)
+
+    if credit <= 0:
+        return "<strong>Insufficient credits.</strong> Please contact admin."
+
+    # Generate response from OpenAI
+    response = get_kannada_response(message)
+
+    # Deduct 1 credit per question
+    user_ref.update({"credit": credit - 1})
+
     return response
 
 @app.route("/logout")
 def logout():
     session.clear()
-    return redirect(url_for("login"))
-
-# ---------------- ADMIN PANEL ----------------
-
-@app.route("/admin")
-def admin_panel():
-    if session.get("mobile") != ADMIN_MOBILE:
-        return redirect(url_for("login"))
-    users = db.reference("users").get() or {}
-    return render_template("admin.html", users=users)
-
-@app.route("/add_user", methods=["POST"])
-def add_user():
-    if session.get("mobile") != ADMIN_MOBILE:
-        return redirect(url_for("login"))
-    data = request.form
-    db.reference(f"users/{data['mobile']}").set({
-        "name": data["name"],
-        "password": data["password"],
-        "credit": int(data["credit"])
-    })
-    return redirect("/admin")
-
-@app.route("/update_user/<mobile>", methods=["POST"])
-def update_user(mobile):
-    if session.get("mobile") != ADMIN_MOBILE:
-        return redirect(url_for("login"))
-    data = request.form
-    db.reference(f"users/{mobile}").update({
-        "name": data["name"],
-        "password": data["password"],
-        "credit": int(data["credit"])
-    })
-    return redirect("/admin")
-
-@app.route("/delete_user/<mobile>", methods=["POST"])
-def delete_user(mobile):
-    if session.get("mobile") != ADMIN_MOBILE:
-        return redirect(url_for("login"))
-    db.reference(f"users/{mobile}").delete()
-    return redirect("/admin")
+    return redirect("/login")
 
 if __name__ == "__main__":
     app.run(debug=True)
