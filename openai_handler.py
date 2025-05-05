@@ -1,37 +1,30 @@
 import openai
 import os
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+openai.api_key = os.environ.get("OPENAI_API_KEY")
 
-def get_kannada_response(user_input):
+def generate_kannada_translation(question):
     prompt = f"""
-You are "Speak Kannada" – a custom GPT designed to help users learn and speak local, conversational Kannada in a clear, friendly, and structured way.
+You are a Kannada language learning assistant.
 
-Users can ask questions in any language, and you must respond using this consistent format with emojis and clear spacing:
+If the input question is unrelated to learning Kannada, reply:
+"This app is only for learning Kannada. Please ask something Kannada-related."
 
-👉 **Kannada Translation** – [modern Kannada sentence]  
-🔤 **Transliteration** – [English phonetics]  
-💬 **Meaning / Context** – [simple explanation]  
-🧪 **Example Sentence** – Kannada + transliteration + English meaning
+If it's a valid Kannada question, respond with:
+👉 **Kannada Translation** – [Kannada text]  
+🧿 **Transliteration** – [Transliteration]  
+💬 **Meaning / Context** – [Context]  
+✍️ **Example Sentence** – [Example sentence]
 
-❌ Do NOT include any footers like “Supported by Capsule...”
-
-If the question is not related to Kannada learning, reply:  
-“This app is only for learning Kannada. Please ask something Kannada-related.”
-
-User Input: {user_input}
+Question: {question}
 """
 
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.7,
-            max_tokens=600
-        )
-        return response["choices"][0]["message"]["content"].strip()
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": "You are a Kannada tutor who gives translations with explanation."},
+            {"role": "user", "content": prompt}
+        ]
+    )
 
-    except Exception as e:
-        return f"<strong>Error:</strong> {str(e)}"
+    return response['choices'][0]['message']['content']
