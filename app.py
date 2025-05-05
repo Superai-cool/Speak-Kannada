@@ -1,128 +1,96 @@
-from flask import Flask, render_template, request, redirect, session, jsonify
+from flask import Flask, render_template, request, redirect, session, url_for, jsonify
 import os
-import firebase_admin
-from firebase_admin import credentials, db
+import re
+from firebase_admin import db, credentials, initialize_app
 from openai_handler import generate_kannada_translation
+from datetime import timedelta
 from dotenv import load_dotenv
 
 load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY")
+app.permanent_session_lifetime = timedelta(days=7)
 
-# Firebase Init
+# Initialize Firebase
 firebase_json = os.environ.get("FIREBASE_JSON")
-cred = credentials.Certificate(eval(firebase_json))
-firebase_admin.initialize_app(cred, {
+firebase_cred = credentials.Certificate(eval(firebase_json))
+initialize_app(firebase_cred, {
     'databaseURL': os.environ.get("FIREBASE_DB_URL")
 })
+users_ref = db.reference("users")
 
-users_ref = db.reference('users')
+# Admin mobile number (ensure this matches Firebase DB entry)
+ADMIN_MOBILE = "8830720742"
 
-# Admin mobile number
-ADMIN_MOBILE = '8830720742'
-
-@app.route('/')
+@app.route("/")
 def index():
-    return render_template('index.html')
+    return render_template("login.html")
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route("/login", methods=["POST"])
 def login():
-    if request.method == 'POST':
-        mobile = request.form['mobile']
-        password = request.form['password']
+    name = request.form.get("name")
+    mobile = request.form.get("mobile")
+    password = request.form.get("password")
 
-        user = users_ref.child(mobile).get()
-        if user and user.get('password') == password:
-            session['user'] = {
-                'mobile': mobile,
-                'name': user.get('name'),
-                'credit': int(user.get('credit'))
-            }
-            if mobile == ADMIN_MOBILE:
-                return redirect('/admin')
-            return redirect('/dashboard')
-        return render_template('login.html', error='Invalid mobile or password')
-    return render_template('login.html')
+    users = users_ref.get()
+    for uid, user in users.items():
+        if user["mobile"] == mobile and user["password"] == password:
+            session["name"] = user["name"]
+            session["mobile"] = user["mobile"]
+            session["credits"] = user["credits"]
+            session["is_admin"] = (user["mobile"] == ADMIN_MOBILE)
+            return redirect("/admin" if session["is_admin"] else "/dashboard")
 
-@app.route('/dashboard')
+    return render_template("login.html", error="Invalid credentials")
+
+@app.route("/dashboard")
 def dashboard():
-    if 'user' not in session:
-        return redirect('/login')
-    return render_template('dashboard.html', name=session['user']['name'], credit=session['user']['credit'])
+    if "mobile" not in session:
+        return redirect("/")
+    return render_template("dashboard.html", name=session["name"], credits=session["credits"])
 
-@app.route('/ask', methods=['POST'])
-def ask():
-    if 'user' not in session:
-        return jsonify({'error': 'Unauthorized'}), 401
+@app.route("/admin")
+def admin_panel():
+    if "mobile" not in session or session.get("mobile") != ADMIN_MOBILE:
+        return redirect("/")
+    users = users_ref.get()
+    return render_template("admin.html", users=users)
 
-    data = request.get_json()
-    user_input = data.get('user_input', '')
-
-    # Validate: must be in English (basic A-Z check)
-    if not user_input or not user_input.replace(" ", "").isascii():
-        return jsonify({'error': 'Please ask your question in English only.'}), 400
-
-    user_mobile = session['user']['mobile']
-    user_credit = session['user']['credit']
-
-    if user_credit <= 0:
-        return jsonify({'error': 'No credits remaining'}), 403
-
-    try:
-        output = generate_kannada_translation(user_input)
-
-        # Deduct 1 credit
-        new_credit = user_credit - 1
-        users_ref.child(user_mobile).update({'credit': new_credit})
-        session['user']['credit'] = new_credit
-
-        return jsonify({'response': output})
-    except Exception as e:
-        return jsonify({'error': f'Failed to get response: {str(e)}'}), 500
-
-@app.route('/logout')
+@app.route("/logout")
 def logout():
     session.clear()
-    return redirect('/')
+    return redirect("/")
 
-@app.route('/admin')
-def admin():
-    if 'user' not in session or session['user']['mobile'] != ADMIN_MOBILE:
-        return redirect('/')
-    all_users = users_ref.get()
-    return render_template('admin.html', users=all_users)
+@app.route("/ask", methods=["POST"])
+def ask():
+    if "mobile" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
 
-@app.route('/update_user', methods=['POST'])
-def update_user():
-    data = request.form
-    mobile = data['mobile']
-    updated_data = {
-        'name': data['name'],
-        'password': data['password'],
-        'credit': int(data['credit'])
-    }
-    users_ref.child(mobile).update(updated_data)
-    return redirect('/admin')
+    user_input = request.json.get("message")
+    if not user_input or not re.search(r'[a-zA-Z]', user_input):
+        return jsonify({"error": "Please ask your question in English only."}), 400
 
-@app.route('/delete_user', methods=['POST'])
-def delete_user():
-    mobile = request.form['mobile']
-    users_ref.child(mobile).delete()
-    return redirect('/admin')
+    if session.get("credits", 0) <= 0:
+        return jsonify({"error": "No credits remaining."}), 402
 
-@app.route('/add_user', methods=['POST'])
-def add_user():
-    data = request.form
-    mobile = data['mobile']
-    if users_ref.child(mobile).get():
-        return 'User already exists'
-    users_ref.child(mobile).set({
-        'name': data['name'],
-        'password': data['password'],
-        'credit': int(data['credit'])
-    })
-    return redirect('/admin')
+    output = generate_kannada_translation(user_input)
 
-if __name__ == '__main__':
+    # Deduct credit
+    user_key = None
+    users = users_ref.get()
+    for uid, user in users.items():
+        if user["mobile"] == session["mobile"]:
+            user_key = uid
+            break
+
+    if user_key:
+        current_credits = users[user_key]["credits"]
+        updated_credits = max(0, current_credits - 1)
+        users_ref.child(user_key).update({"credits": updated_credits})
+        session["credits"] = updated_credits
+
+    return jsonify({"response": output, "credits": session["credits"]})
+
+if __name__ == "__main__":
     app.run(debug=True)
