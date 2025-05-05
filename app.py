@@ -1,22 +1,17 @@
-# app.py
-
 from flask import Flask, render_template, request, redirect, url_for, session
 import firebase_admin
 from firebase_admin import credentials, db
-from openai_handler import generate_kannada_translation
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
-# Firebase init
-cred = credentials.Certificate(eval(os.getenv("FIREBASE_JSON")))
-firebase_admin.initialize_app(cred, {
-    'databaseURL': os.getenv("FIREBASE_DB_URL")
-})
+from openai_handler import generate_kannada_translation
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY")
+app.secret_key = os.environ.get("SECRET_KEY")
+
+# Firebase initialization
+cred = credentials.Certificate(eval(os.environ.get("FIREBASE_JSON")))
+firebase_admin.initialize_app(cred, {
+    'databaseURL': os.environ.get("FIREBASE_DB_URL")
+})
 
 @app.route("/")
 def index():
@@ -27,38 +22,48 @@ def login():
     if request.method == "POST":
         mobile = request.form["mobile"]
         password = request.form["password"]
-        user_ref = db.reference(f"users/{mobile}")
-        user_data = user_ref.get()
-        if user_data and user_data["password"] == password:
-            session["user"] = user_data["name"]
+        users_ref = db.reference("users")
+        user = users_ref.child(mobile).get()
+        if user and user.get("password") == password:
+            session["user"] = user["name"]
             session["mobile"] = mobile
-            return redirect("/dashboard")
+            return redirect(url_for("dashboard"))
         else:
             return render_template("login.html", error="Invalid credentials")
     return render_template("login.html")
 
-@app.route("/dashboard", methods=["GET", "POST"])
+@app.route("/dashboard")
 def dashboard():
     if "user" not in session:
-        return redirect("/login")
-    
+        return redirect(url_for("login"))
+    mobile = session.get("mobile")
+    user_data = db.reference(f"users/{mobile}").get()
+    credit = user_data.get("credit", 0)
+    return render_template("dashboard.html", name=session["user"], credit=credit)
+
+@app.route("/get_response", methods=["POST"])
+def get_response():
+    if "user" not in session:
+        return redirect(url_for("login"))
+
+    message = request.json.get("message", "")
     mobile = session.get("mobile")
     user_ref = db.reference(f"users/{mobile}")
     user_data = user_ref.get()
     credit = user_data.get("credit", 0)
 
-    if request.method == "POST":
-        user_input = request.form["message"]
-        if credit > 0 and user_input.strip():
-            response = generate_kannada_translation(user_input)
-            user_ref.update({"credit": credit - 1})
-            credit -= 1
-            return render_template("dashboard.html", name=session["user"], credit=credit, user_input=user_input, response=response)
-        else:
-            error = "No credits left. Please contact admin."
-            return render_template("dashboard.html", name=session["user"], credit=credit, error=error)
+    if credit <= 0:
+        return {"error": "Insufficient credit. Please contact support."}
 
-    return render_template("dashboard.html", name=session["user"], credit=credit)
+    # Call OpenAI function
+    try:
+        response = generate_kannada_translation(message)
+    except Exception as e:
+        return {"error": str(e)}
+
+    # Deduct credit
+    user_ref.update({"credit": credit - 1})
+    return {"response": response, "remaining_credit": credit - 1}
 
 @app.route("/logout")
 def logout():
