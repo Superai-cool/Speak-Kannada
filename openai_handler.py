@@ -1,30 +1,27 @@
-import openai
+# openai_handler.py
+
+from openai import OpenAI
 import os
 
-openai.api_key = os.environ.get("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-def generate_kannada_translation(question):
-    prompt = f"""
-You are a Kannada language learning assistant.
+def generate_kannada_translation(user_input):
+    prompt = f"""You are a Kannada language assistant.
 
-If the input question is unrelated to learning Kannada, reply:
-"This app is only for learning Kannada. Please ask something Kannada-related."
+When someone asks: "{user_input}", generate a Kannada learning response in the following format, each on a new line:
 
-If it's a valid Kannada question, respond with:
-👉 **Kannada Translation** – [Kannada text]  
-🧿 **Transliteration** – [Transliteration]  
-💬 **Meaning / Context** – [Context]  
-✍️ **Example Sentence** – [Example sentence]
+👉 **Kannada Translation** – [Kannada here]  
+🧿 **Transliteration** – [English transliteration]  
+💬 **Meaning / Context** – [Brief English explanation]  
+✍️ **Example Sentence** – [Full Kannada + Transliteration + English meaning]  
 
-Question: {question}
-"""
+Only respond in this format. Do not include extra messages or promotional text."""
 
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[
-            {"role": "system", "content": "You are a Kannada tutor who gives translations with explanation."},
+            {"role": "system", "content": "You help people learn Kannada with clarity and friendly tone."},
             {"role": "user", "content": prompt}
         ]
     )
-
-    return response['choices'][0]['message']['content']
+    return response.choices[0].message.content.strip()
