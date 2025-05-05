@@ -6,6 +6,9 @@ import os
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "supersecretkey")
 
+# Your admin mobile number
+ADMIN_MOBILE = "8830720742"
+
 @app.route("/")
 def home():
     return render_template("index.html")
@@ -48,11 +51,15 @@ def logout():
 
 @app.route("/admin")
 def admin_panel():
+    if session.get("mobile") != ADMIN_MOBILE:
+        return redirect(url_for("login"))
     users = db.reference("users").get() or {}
     return render_template("admin.html", users=users)
 
 @app.route("/add_user", methods=["POST"])
 def add_user():
+    if session.get("mobile") != ADMIN_MOBILE:
+        return redirect(url_for("login"))
     data = request.form
     db.reference(f"users/{data['mobile']}").set({
         "name": data["name"],
@@ -63,6 +70,8 @@ def add_user():
 
 @app.route("/update_user/<mobile>", methods=["POST"])
 def update_user(mobile):
+    if session.get("mobile") != ADMIN_MOBILE:
+        return redirect(url_for("login"))
     data = request.form
     db.reference(f"users/{mobile}").update({
         "name": data["name"],
@@ -73,6 +82,8 @@ def update_user(mobile):
 
 @app.route("/delete_user/<mobile>", methods=["POST"])
 def delete_user(mobile):
+    if session.get("mobile") != ADMIN_MOBILE:
+        return redirect(url_for("login"))
     db.reference(f"users/{mobile}").delete()
     return redirect("/admin")
 
