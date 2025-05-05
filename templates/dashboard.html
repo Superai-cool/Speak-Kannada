@@ -17,9 +17,19 @@
     header {
       background: #3249d6;
       color: white;
-      padding: 16px;
-      text-align: center;
-      font-size: 1.2rem;
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 1rem;
+    }
+
+    header .left {
+      font-weight: 600;
+    }
+
+    header .right {
+      font-size: 0.9rem;
     }
 
     .chat-container {
@@ -73,11 +83,24 @@
       font-size: 0.85rem;
       color: #666;
     }
+
+    .logout-link {
+      color: white;
+      text-decoration: underline;
+      margin-left: 16px;
+      font-size: 0.85rem;
+    }
   </style>
 </head>
 <body>
   <header>
-    🗣️ Speak Kannada – Learn with AI
+    <div class="left">
+      🗣️ Speak Kannada – Learn with AI
+    </div>
+    <div class="right">
+      {{ name }} | Credit: {{ credit }}
+      <a href="/logout" class="logout-link">Logout</a>
+    </div>
   </header>
 
   <div class="chat-container" id="chatBox">
