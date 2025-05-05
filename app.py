@@ -1,101 +1,120 @@
 from flask import Flask, render_template, request, session, redirect, url_for
-import os
-from firebase_admin import credentials, db, initialize_app
+from firebase_config import db
 from openai_handler import generate_kannada_translation
-from dotenv import load_dotenv
+import os
 
+from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY")
+app.secret_key = os.environ.get('SECRET_KEY', 'default_secret_key')
 
-# Firebase setup
-cred = credentials.Certificate(eval(os.getenv("FIREBASE_JSON")))
-initialize_app(cred, {"databaseURL": os.getenv("FIREBASE_DB_URL")})
-ref = db.reference("/users")
+ADMIN_NUMBER = '8830720742'
 
-# Admin mobile number
-ADMIN_MOBILE = "8830720742"
-
-@app.route("/")
+@app.route('/')
 def index():
-    return render_template("index.html")
+    return render_template('index.html')
 
-@app.route("/login", methods=["POST"])
+@app.route('/login', methods=['GET', 'POST'])
 def login():
-    mobile = request.form.get("mobile")
-    password = request.form.get("password")
+    if request.method == 'POST':
+        mobile = request.form['mobile']
+        password = request.form['password']
 
-    user_data = ref.child(mobile).get()
-    if user_data and user_data.get("password") == password:
-        session["mobile"] = mobile
-        session["name"] = user_data.get("name")
-        session["credits"] = user_data.get("credits", 0)
-        if mobile == ADMIN_MOBILE:
-            return redirect("/admin")
-        return redirect("/dashboard")
-    return "Invalid login", 403
+        user_ref = db.child("users").child(mobile).get()
+        if user_ref.val() and user_ref.val().get("password") == password:
+            session['mobile'] = mobile
+            session['name'] = user_ref.val().get("name", "User")
+            session['credits'] = user_ref.val().get("credits", 0)
 
-@app.route("/dashboard")
+            if mobile == ADMIN_NUMBER:
+                return redirect('/admin')
+
+            return redirect('/dashboard')
+        else:
+            return render_template('login.html', error="Invalid credentials.")
+    return render_template('login.html')
+
+@app.route('/dashboard', methods=['GET', 'POST'])
 def dashboard():
-    if "mobile" not in session:
-        return redirect("/")
-    return render_template("dashboard.html", name=session["name"], credits=session["credits"])
+    if 'mobile' not in session:
+        return redirect('/login')
 
-@app.route("/get_kannada", methods=["POST"])
-def get_kannada():
-    if "mobile" not in session:
-        return "Session expired. Please login again.", 401
+    return render_template('dashboard.html', name=session.get("name"), credits=session.get("credits"))
 
-    query = request.json.get("query")
-    mobile = session["mobile"]
+@app.route('/translate', methods=['POST'])
+def translate():
+    if 'mobile' not in session:
+        return redirect('/login')
 
-    if mobile != ADMIN_MOBILE:
-        if not query.strip().replace(" ", "").isascii():
-            return {"error": "Please ask your question in English only."}
+    user_input = request.form['user_input']
 
-        current_credits = session.get("credits", 0)
-        if current_credits <= 0:
-            return {"error": "No credits left. Please contact support."}
+    if not user_input.strip() or not user_input.replace(' ', '').isascii():
+        return {"error": "Please ask your question in English only."}
 
-    result = generate_kannada_translation(query)
+    credits = int(session.get("credits", 0))
+    if credits <= 0:
+        return {"error": "No credits left."}
 
-    if "error" not in result and mobile != ADMIN_MOBILE:
-        new_credits = session["credits"] - 1
-        ref.child(mobile).update({"credits": new_credits})
-        session["credits"] = new_credits
+    result = generate_kannada_translation(user_input)
+
+    # Deduct credit
+    mobile = session['mobile']
+    credits -= 1
+    session['credits'] = credits
+    db.child("users").child(mobile).update({"credits": credits})
 
     return result
 
-@app.route("/admin")
+@app.route('/admin', methods=['GET', 'POST'])
 def admin():
-    if session.get("mobile") != ADMIN_MOBILE:
-        return redirect("/")
-    users = ref.get() or {}
-    return render_template("admin.html", users=users)
+    if 'mobile' not in session or session['mobile'] != ADMIN_NUMBER:
+        return redirect('/login')
 
-@app.route("/update_user", methods=["POST"])
+    users = db.child("users").get()
+    user_list = []
+    if users.each():
+        for user in users.each():
+            user_data = user.val()
+            user_list.append({
+                "mobile": user.key(),
+                "name": user_data.get("name", ""),
+                "credits": user_data.get("credits", 0),
+                "password": user_data.get("password", "")
+            })
+
+    return render_template("admin.html", users=user_list)
+
+@app.route('/update_user', methods=['POST'])
 def update_user():
-    if session.get("mobile") != ADMIN_MOBILE:
-        return redirect("/")
-    mobile = request.form.get("mobile")
-    field = request.form.get("field")
-    value = request.form.get("value")
-    ref.child(mobile).update({field: value})
-    return redirect("/admin")
+    if session.get('mobile') != ADMIN_NUMBER:
+        return redirect('/login')
 
-@app.route("/delete_user", methods=["POST"])
+    mobile = request.form['mobile']
+    name = request.form['name']
+    password = request.form['password']
+    credits = request.form['credits']
+
+    db.child("users").child(mobile).update({
+        "name": name,
+        "password": password,
+        "credits": int(credits)
+    })
+    return redirect('/admin')
+
+@app.route('/delete_user', methods=['POST'])
 def delete_user():
-    if session.get("mobile") != ADMIN_MOBILE:
-        return redirect("/")
-    mobile = request.form.get("mobile")
-    ref.child(mobile).delete()
-    return redirect("/admin")
+    if session.get('mobile') != ADMIN_NUMBER:
+        return redirect('/login')
 
-@app.route("/logout")
+    mobile = request.form['mobile']
+    db.child("users").child(mobile).remove()
+    return redirect('/admin')
+
+@app.route('/logout')
 def logout():
     session.clear()
-    return redirect("/")
+    return redirect('/login')
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     app.run(debug=True)
