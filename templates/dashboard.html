@@ -1,131 +1,93 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Dashboard | Speak Kannada</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body {
-      background-color: #f3f4f6;
+    * {
       font-family: 'Segoe UI', sans-serif;
+      box-sizing: border-box;
     }
-    .message {
-      margin-bottom: 12px;
-      padding: 12px 16px;
-      border-radius: 12px;
-      max-width: 90%;
-      word-wrap: break-word;
+    body {
+      background-color: #f5f7fa;
     }
-    .user-msg {
-      background-color: #e0f2fe;
-      margin-left: auto;
-    }
-    .ai-msg {
-      background-color: #fff;
-      border: 1px solid #d1d5db;
-    }
-    .loading {
-      display: inline-block;
-      width: 22px;
-      height: 22px;
-      border: 3px solid #3b82f6;
-      border-radius: 50%;
-      border-top-color: transparent;
-      animation: spin 1s linear infinite;
-      margin-left: 10px;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
+    .reply-box {
+      background: #fff;
+      padding: 15px;
+      border-left: 4px solid #6366f1;
+      border-radius: 10px;
+      margin-top: 20px;
     }
   </style>
 </head>
-<body class="min-h-screen flex flex-col">
-  <nav class="bg-blue-800 text-white px-4 py-3 flex justify-between items-center">
-    <h1 class="text-lg font-semibold">🗣️ Speak Kannada – Learn with AI</h1>
+<body>
+  <div class="bg-indigo-700 text-white px-6 py-4 flex justify-between items-center">
+    <div class="text-lg font-bold">🗣️ Speak Kannada – Learn with AI</div>
     <div>
-      {{ name }} | Credit: <span id="credit">{{ credit }}</span> 
-      <a href="/logout" class="ml-4 underline text-sm">Logout</a>
+      {{ name }} | Credit: {{ credit }}
+      <a href="/logout" class="ml-4 underline">Logout</a>
     </div>
-  </nav>
+  </div>
 
-  <main class="flex-1 px-4 py-4 overflow-y-auto" id="chat-box">
-    <div class="ai-msg message">Hi {{ name }}, ask me how to say anything in Kannada 😊</div>
-  </main>
-
-  <footer class="p-4 bg-white shadow-md">
-    <div class="flex">
-      <input id="user-input" class="flex-1 border border-gray-300 p-2 rounded-md mr-2" placeholder="Type your question here..." />
-      <button onclick="sendMessage()" class="bg-blue-600 text-white px-4 py-2 rounded-md">Send</button>
+  <div class="max-w-3xl mx-auto p-6">
+    <!-- App Intro -->
+    <div class="bg-yellow-100 p-4 rounded-lg text-gray-800 text-sm mb-4">
+      👋 Welcome to Speak Kannada! This app helps you translate daily English questions into Kannada with proper pronunciation and usage examples. Ask in English and get your answer instantly.
     </div>
-  </footer>
+
+    <!-- Chat Display -->
+    <div id="chat-box"></div>
+
+    <!-- User Input Form -->
+    <form id="chat-form" class="mt-6">
+      <input type="text" id="user-input" name="user_input" placeholder="Type your question in English..." class="w-full p-3 border rounded-lg" required />
+      <button type="submit" class="mt-2 px-5 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Send</button>
+    </form>
+  </div>
 
   <script>
-    function appendMessage(content, sender = 'ai', id = null) {
-      const chatBox = document.getElementById('chat-box');
-      const div = document.createElement('div');
-      div.className = `${sender}-msg message`;
-      if (id) div.id = id;
-      div.innerHTML = content.replace(/\n/g, "<br>");
-      chatBox.appendChild(div);
-      chatBox.scrollTop = chatBox.scrollHeight;
-    }
+    const form = document.getElementById('chat-form');
+    const input = document.getElementById('user-input');
+    const chatBox = document.getElementById('chat-box');
 
-    function removeElement(id) {
-      const el = document.getElementById(id);
-      if (el) el.remove();
-    }
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const question = input.value.trim();
+      if (!question) return;
 
-    async function sendMessage() {
-      const input = document.getElementById('user-input');
-      const text = input.value.trim();
-      if (!text) return;
-      appendMessage(text, 'user');
-      input.value = "";
-
-      // Loading spinner
-      const loadingId = "loading-spinner";
-      appendMessage('<div class="flex items-center"><span>Thinking...</span><span class="loading"></span></div>', 'ai', loadingId);
-
-      try {
-        const res = await fetch('/get_response', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text })
-        });
-
-        removeElement(loadingId);
-
-        const data = await res.json();
-        if (data.error) {
-          appendMessage(`<strong>Error:</strong> ${data.error}`, 'ai');
-        } else {
-          const formatted = formatResponse(data.response);
-          appendMessage(formatted, 'ai');
-          document.getElementById('credit').innerText = data.remaining_credit;
-        }
-      } catch (err) {
-        removeElement(loadingId);
-        appendMessage("⚠️ Something went wrong. Please try again.", 'ai');
+      // English check (basic)
+      if (!/^[A-Za-z0-9.,?'\"\\s]+$/.test(question)) {
+        alert("❌ Please ask your question in English only.");
+        return;
       }
-    }
 
-    function formatResponse(text) {
-      const lines = text.trim().split("\n").filter(l => l);
-      return lines.map(line => {
-        if (line.includes("Kannada Translation")) {
-          return `👉 <b>Kannada Translation</b> – ${line.split("–")[1].trim()}`;
-        } else if (line.includes("Transliteration")) {
-          return `🎯 <b>Transliteration</b> – ${line.split("–")[1].trim()}`;
-        } else if (line.includes("Meaning") || line.includes("Context")) {
-          return `💬 <b>Meaning / Context</b> – ${line.split("–")[1].trim()}`;
-        } else if (line.includes("Example")) {
-          return `✍️ <b>Example Sentence</b> – ${line.split("–")[1].trim()}`;
-        } else {
-          return line;
-        }
-      }).join("<br>");
-    }
+      const userHtml = `<div class='text-right my-3'><div class='inline-block bg-blue-100 text-gray-800 px-4 py-2 rounded-xl'>${question}</div></div>`;
+      chatBox.insertAdjacentHTML('beforeend', userHtml);
+      input.value = '';
+
+      const loader = document.createElement('div');
+      loader.className = 'reply-box';
+      loader.innerHTML = '⏳ Generating response...';
+      chatBox.appendChild(loader);
+
+      const res = await fetch('/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_input: question })
+      });
+
+      const data = await res.json();
+      loader.remove();
+
+      if (res.status !== 200) {
+        chatBox.insertAdjacentHTML('beforeend', `<div class='reply-box text-red-600'>${data.error || 'Something went wrong.'}</div>`);
+        return;
+      }
+
+      chatBox.insertAdjacentHTML('beforeend', `<div class='reply-box'>${data.response}</div>`);
+    });
   </script>
 </body>
 </html>
