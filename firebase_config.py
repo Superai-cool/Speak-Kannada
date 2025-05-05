@@ -1,16 +1,18 @@
 import firebase_admin
 from firebase_admin import credentials, db
+import json
 import os
 
-# Get the path to the uploaded JSON file in Railway
-firebase_key_path = os.getenv("FIREBASE_KEY_PATH", "firebase-adminsdk.json")
-
-# Get the Firebase Realtime Database URL from Railway environment variables
+# Get full JSON string from Railway environment variable
+firebase_json_string = os.getenv("FIREBASE_JSON")
 firebase_db_url = os.getenv("FIREBASE_DB_URL")
 
-# Only initialize once
+# Load the JSON string into a Python dict
+firebase_credential_dict = json.loads(firebase_json_string)
+
+# Initialize Firebase Admin
 if not firebase_admin._apps:
-    cred = credentials.Certificate(firebase_key_path)
+    cred = credentials.Certificate(firebase_credential_dict)
     firebase_admin.initialize_app(cred, {
         'databaseURL': firebase_db_url
     })
