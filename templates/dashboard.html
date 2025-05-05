@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Dashboard | Speak Kannada</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      background: #f7f9fc;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    header {
+      background: #3249d6;
+      color: white;
+      padding: 16px;
+      text-align: center;
+      font-size: 1.2rem;
+    }
+
+    .chat-container {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+    }
+
+    .message {
+      background: white;
+      padding: 14px;
+      margin: 10px 0;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    }
+
+    .user {
+      background: #e1efff;
+      text-align: right;
+    }
+
+    .input-bar {
+      display: flex;
+      padding: 12px;
+      background: #ffffff;
+      border-top: 1px solid #ddd;
+    }
+
+    .input-bar input {
+      flex: 1;
+      padding: 12px;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+
+    .input-bar button {
+      padding: 12px 20px;
+      margin-left: 10px;
+      background: #3249d6;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    footer {
+      text-align: center;
+      padding: 10px;
+      font-size: 0.85rem;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    🗣️ Speak Kannada – Learn with AI
+  </header>
+
+  <div class="chat-container" id="chatBox">
+    <div class="message">Hi {{ name }}, ask me how to say anything in Kannada 😊</div>
+  </div>
+
+  <form class="input-bar" onsubmit="sendMessage(event)">
+    <input type="text" id="userInput" placeholder="Type your question here..." required />
+    <button type="submit">Send</button>
+  </form>
+
+  <footer>
+    Supported by 📱 <a href="https://2ly.link/265bX" target="_blank">Capsule</a> | India’s 1st AI-Powered Hyperlocal News App
+  </footer>
+
+  <script>
+    function sendMessage(event) {
+      event.preventDefault();
+      const input = document.getElementById('userInput');
+      const message = input.value.trim();
+      if (!message) return;
+
+      const chatBox = document.getElementById('chatBox');
+
+      const userMsg = document.createElement('div');
+      userMsg.className = 'message user';
+      userMsg.textContent = message;
+      chatBox.appendChild(userMsg);
+
+      fetch("/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: "message=" + encodeURIComponent(message)
+      })
+      .then(res => res.text())
+      .then(response => {
+        const botMsg = document.createElement('div');
+        botMsg.className = 'message';
+        botMsg.innerHTML = response;
+        chatBox.appendChild(botMsg);
+        chatBox.scrollTop = chatBox.scrollHeight;
+      });
+
+      input.value = "";
+    }
+  </script>
+</body>
+</html>
