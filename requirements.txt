@@ -1,4 +1,4 @@
 Flask==2.3.2
 firebase-admin==6.3.0
-openai==1.14.3
+openai==0.28.1
 gunicorn==21.2.0
