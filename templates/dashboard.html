@@ -126,15 +126,15 @@
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: "message=" + encodeURIComponent(message)
     })
-    .then(res => res.text())
-    .then(response => {
+    .then(res => res.json())
+    .then(data => {
       const botMsg = document.createElement('div');
       botMsg.className = 'message';
-      botMsg.innerHTML = response;
+      botMsg.innerHTML = data.reply;
       chatBox.appendChild(botMsg);
       chatBox.scrollTop = chatBox.scrollHeight;
 
-      // ✅ Update credit count directly in navbar
+      // ✅ Update credit display without reload
       const creditText = document.querySelector("header span:nth-child(2)");
       let match = creditText.textContent.match(/Credit:\s*(\d+)/);
       if (match) {
