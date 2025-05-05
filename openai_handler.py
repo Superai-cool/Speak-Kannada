@@ -1,31 +1,39 @@
 import openai
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
 
 openai.api_key = os.environ.get("OPENAI_API_KEY")
 
 def generate_kannada_translation(user_input):
     prompt = f"""
-You are a Kannada language tutor bot that helps users translate phrases or sentences into Kannada.
+You are a Kannada language tutor bot that helps users translate English phrases into Kannada.
 
-Only answer if the question is asked in English. If not, respond: "This app is only for learning Kannada. Please ask something Kannada-related."
+Only respond if the user is asking something about how to say something in Kannada. If the input is not related to learning Kannada, reply with:
 
-If it's valid, return in the following Markdown format using emojis:
+"This app is only for learning Kannada. Please ask something Kannada-related."
 
-👉 Kannada Translation – [Kannada text] ([Transliterated text])
-🔤 Transliteration – [Transliteration]
-💬 Meaning / Context – [English meaning]
-✍️ Example Sentence – [Kannada sentence] ([Transliterated version])
+Otherwise, give your answer in the following format using emojis and markdown styling:
+
+👉 **Kannada Translation** – [Kannada text] ([Transliteration])  
+🔤 **Transliteration** – [Transliteration only]  
+💬 **Meaning / Context** – [Brief English meaning]  
+✍️ **Example Sentence** – [Kannada sentence] ([Transliteration])
 
 User Input: "{user_input}"
-    """
+"""
 
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.6
-    )
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4o",  # Or whichever model you prefer
+            messages=[
+                {"role": "system", "content": "You are a helpful language tutor."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=500
+        )
+        answer = response['choices'][0]['message']['content']
+        return answer.strip()
 
-    return response['choices'][0]['message']['content']
+    except Exception as e:
+        print("OpenAI Error:", e)
+        return "⚠️ Sorry, something went wrong. Please try again."
