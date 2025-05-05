@@ -1,7 +1,7 @@
 import openai
 import os
 
-# Load the API key from Railway environment variable
+# Set your OpenAI API key from Railway env var
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def get_kannada_response(user_input):
@@ -26,7 +26,7 @@ User Input: {user_input}
 
     try:
         response = openai.chat.completions.create(
-            model="gpt-4",  # or use "gpt-3.5-turbo" if you're on free tier
+            model="gpt-4",
             messages=[
                 {"role": "user", "content": prompt}
             ],
@@ -34,6 +34,5 @@ User Input: {user_input}
             temperature=0.7
         )
         return response.choices[0].message.content.strip()
-
     except Exception as e:
         return f"<strong>Error:</strong> {str(e)}"
