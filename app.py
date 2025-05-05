@@ -1,114 +1,69 @@
-import os
+# app.py
+
 from flask import Flask, render_template, request, redirect, url_for, session
 import firebase_admin
 from firebase_admin import credentials, db
 from openai_handler import generate_kannada_translation
-
+import os
 from dotenv import load_dotenv
+
 load_dotenv()
 
-app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY")
-
-# Firebase setup
-firebase_cert_json = os.environ.get("FIREBASE_JSON")
-if not firebase_cert_json:
-    raise Exception("FIREBASE_JSON not set in Railway variables.")
-
-import json
-cred = credentials.Certificate(json.loads(firebase_cert_json))
+# Firebase init
+cred = credentials.Certificate(eval(os.getenv("FIREBASE_JSON")))
 firebase_admin.initialize_app(cred, {
-    'databaseURL': os.environ.get("FIREBASE_DB_URL")
+    'databaseURL': os.getenv("FIREBASE_DB_URL")
 })
 
-# Routes
-@app.route('/')
-def home():
+app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY")
+
+@app.route("/")
+def index():
     return render_template("index.html")
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route("/login", methods=["GET", "POST"])
 def login():
-    error = None
-    if request.method == 'POST':
-        mobile = request.form['mobile']
-        password = request.form['password']
-        user_ref = db.reference(f'users/{mobile}')
-        user = user_ref.get()
-        if user and user['password'] == password:
-            session['user'] = user['name']
-            session['mobile'] = mobile
-            return redirect(url_for('dashboard'))
+    if request.method == "POST":
+        mobile = request.form["mobile"]
+        password = request.form["password"]
+        user_ref = db.reference(f"users/{mobile}")
+        user_data = user_ref.get()
+        if user_data and user_data["password"] == password:
+            session["user"] = user_data["name"]
+            session["mobile"] = mobile
+            return redirect("/dashboard")
         else:
-            error = 'Invalid credentials'
-    return render_template('login.html', error=error)
+            return render_template("login.html", error="Invalid credentials")
+    return render_template("login.html")
 
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('login'))
-
-@app.route('/dashboard', methods=['GET', 'POST'])
+@app.route("/dashboard", methods=["GET", "POST"])
 def dashboard():
     if "user" not in session:
-        return redirect(url_for("login"))
-
-    name = session["user"]
-    mobile = session["mobile"]
+        return redirect("/login")
+    
+    mobile = session.get("mobile")
     user_ref = db.reference(f"users/{mobile}")
     user_data = user_ref.get()
     credit = user_data.get("credit", 0)
 
-    response = None
-    if request.method == 'POST':
-        question = request.form['question']
-        if credit > 0:
-            try:
-                response = generate_kannada_translation(question)
-                credit -= 1
-                user_ref.update({"credit": credit})
-            except Exception as e:
-                response = f"Error: {str(e)}"
+    if request.method == "POST":
+        user_input = request.form["message"]
+        if credit > 0 and user_input.strip():
+            response = generate_kannada_translation(user_input)
+            user_ref.update({"credit": credit - 1})
+            credit -= 1
+            return render_template("dashboard.html", name=session["user"], credit=credit, user_input=user_input, response=response)
         else:
-            response = "You don't have enough credits."
+            error = "No credits left. Please contact admin."
+            return render_template("dashboard.html", name=session["user"], credit=credit, error=error)
 
-    return render_template("dashboard.html", name=name, credit=credit, response=response)
+    return render_template("dashboard.html", name=session["user"], credit=credit)
 
-@app.route('/admin')
-def admin():
-    users = db.reference("users").get()
-    return render_template("admin.html", users=users)
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
-@app.route('/update_user', methods=["POST"])
-def update_user():
-    mobile = request.form["mobile"]
-    name = request.form["name"]
-    password = request.form["password"]
-    credit = int(request.form["credit"])
-    db.reference(f"users/{mobile}").update({
-        "name": name,
-        "password": password,
-        "credit": credit
-    })
-    return redirect(url_for("admin"))
-
-@app.route('/add_user', methods=["POST"])
-def add_user():
-    mobile = request.form["mobile"]
-    name = request.form["name"]
-    password = request.form["password"]
-    credit = int(request.form["credit"])
-    db.reference(f"users/{mobile}").set({
-        "name": name,
-        "password": password,
-        "credit": credit
-    })
-    return redirect(url_for("admin"))
-
-@app.route('/delete_user', methods=["POST"])
-def delete_user():
-    mobile = request.form["mobile"]
-    db.reference(f"users/{mobile}").delete()
-    return redirect(url_for("admin"))
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True)
