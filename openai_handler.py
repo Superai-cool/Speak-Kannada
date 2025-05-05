@@ -1,30 +1,29 @@
 import openai
 import os
 
-openai.api_key = os.environ.get("OPENAI_API_KEY")
+# Set your OpenAI API key from environment variable
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
-def generate_kannada_translation(user_input):
-    prompt = f"""
-You are a Kannada language teacher. When someone gives a sentence or phrase in any language,
-your task is to return the following in Kannada in a clear and helpful way.
+def generate_kannada_translation(user_message):
+    system_prompt = """
+You are a Kannada language tutor. Your job is to help users translate and learn Kannada by responding to any sentence they type in any language.
 
-Respond ONLY if it's a Kannada-learning-related sentence. If not, reply:
-"This app is only for learning Kannada. Please ask something Kannada-related."
+Only give Kannada-related translations. Your format must be:
 
-Example Output Format:
-👉 **Kannada Translation** – ...
-🧠 **Transliteration** – ...
-💬 **Meaning / Context** – ...
-✍️ **Example Sentence** – ...
+👉 Kannada Translation – [Kannada sentence] (transliterated form)
+🎯 Transliteration – [transliterated Kannada sentence]
+💬 Meaning / Context – [explanation in English]
+✍️ Example Sentence – [example in Kannada with transliteration and meaning]
 
-Now respond to: "{user_input}"
+Do not reject or deny any sentence. Always assume the user wants to learn how to say that sentence in Kannada.
 """
 
-    completion = openai.ChatCompletion.create(
+    response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.7,
-        max_tokens=500
+        messages=[
+            { "role": "system", "content": system_prompt },
+            { "role": "user", "content": user_message }
+        ]
     )
 
-    return completion.choices[0].message["content"]
+    return response.choices[0].message.content.strip()
