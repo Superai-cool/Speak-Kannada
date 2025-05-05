@@ -25,6 +25,19 @@
       background-color: #fff;
       border: 1px solid #d1d5db;
     }
+    .loading {
+      display: inline-block;
+      width: 22px;
+      height: 22px;
+      border: 3px solid #3b82f6;
+      border-radius: 50%;
+      border-top-color: transparent;
+      animation: spin 1s linear infinite;
+      margin-left: 10px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -48,13 +61,19 @@
   </footer>
 
   <script>
-    function appendMessage(content, sender = 'ai') {
+    function appendMessage(content, sender = 'ai', id = null) {
       const chatBox = document.getElementById('chat-box');
       const div = document.createElement('div');
       div.className = `${sender}-msg message`;
+      if (id) div.id = id;
       div.innerHTML = content.replace(/\n/g, "<br>");
       chatBox.appendChild(div);
       chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function removeElement(id) {
+      const el = document.getElementById(id);
+      if (el) el.remove();
     }
 
     async function sendMessage() {
@@ -64,6 +83,10 @@
       appendMessage(text, 'user');
       input.value = "";
 
+      // Loading spinner
+      const loadingId = "loading-spinner";
+      appendMessage('<div class="flex items-center"><span>Thinking...</span><span class="loading"></span></div>', 'ai', loadingId);
+
       try {
         const res = await fetch('/get_response', {
           method: 'POST',
@@ -71,16 +94,37 @@
           body: JSON.stringify({ message: text })
         });
 
+        removeElement(loadingId);
+
         const data = await res.json();
         if (data.error) {
           appendMessage(`<strong>Error:</strong> ${data.error}`, 'ai');
         } else {
-          appendMessage(data.response, 'ai');
+          const formatted = formatResponse(data.response);
+          appendMessage(formatted, 'ai');
           document.getElementById('credit').innerText = data.remaining_credit;
         }
       } catch (err) {
+        removeElement(loadingId);
         appendMessage("⚠️ Something went wrong. Please try again.", 'ai');
       }
+    }
+
+    function formatResponse(text) {
+      const lines = text.trim().split("\n").filter(l => l);
+      return lines.map(line => {
+        if (line.includes("Kannada Translation")) {
+          return `👉 <b>Kannada Translation</b> – ${line.split("–")[1].trim()}`;
+        } else if (line.includes("Transliteration")) {
+          return `🎯 <b>Transliteration</b> – ${line.split("–")[1].trim()}`;
+        } else if (line.includes("Meaning") || line.includes("Context")) {
+          return `💬 <b>Meaning / Context</b> – ${line.split("–")[1].trim()}`;
+        } else if (line.includes("Example")) {
+          return `✍️ <b>Example Sentence</b> – ${line.split("–")[1].trim()}`;
+        } else {
+          return line;
+        }
+      }).join("<br>");
     }
   </script>
 </body>
