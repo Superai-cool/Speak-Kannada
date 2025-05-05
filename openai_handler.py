@@ -1,39 +1,39 @@
 import openai
 import os
+import re
 
-openai.api_key = os.environ.get("OPENAI_API_KEY")
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
-def generate_kannada_translation(user_input):
-    prompt = f"""
-You are a Kannada language tutor bot that helps users translate English phrases into Kannada.
+def is_english(text):
+    return re.fullmatch(r'[A-Za-z0-9\s\?\.\!\,\']+', text.strip()) is not None
 
-Only respond if the user is asking something about how to say something in Kannada. If the input is not related to learning Kannada, reply with:
+def generate_kannada_translation(prompt):
+    if not is_english(prompt):
+        return {
+            "error": "Please ask your question in English only."
+        }
 
-"This app is only for learning Kannada. Please ask something Kannada-related."
+    system_instruction = """
+You are a helpful Kannada language expert. You help users translate and understand Kannada from English phrases.
 
-Otherwise, give your answer in the following format using emojis and markdown styling:
+Format the response in 4 bold sections with emojis:
+👉 **Kannada Translation** – (Kannada script with English transliteration in brackets)
+🎯 **Transliteration** – (Latin script)
+💬 **Meaning / Context** – (Short English explanation)
+✍️ **Example Sentence** – (A real-world sentence in Kannada with English transliteration in brackets)
 
-👉 **Kannada Translation** – [Kannada text] ([Transliteration])  
-🔤 **Transliteration** – [Transliteration only]  
-💬 **Meaning / Context** – [Brief English meaning]  
-✍️ **Example Sentence** – [Kannada sentence] ([Transliteration])
-
-User Input: "{user_input}"
+Avoid extra information. Keep it brief and relevant to the input. Always translate assuming the user is trying to speak in Kannada.
 """
 
     try:
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",  # Or whichever model you prefer
+            model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a helpful language tutor."},
+                {"role": "system", "content": system_instruction},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.7,
-            max_tokens=500
+            temperature=0.7
         )
-        answer = response['choices'][0]['message']['content']
-        return answer.strip()
-
+        return {"answer": response.choices[0].message.content.strip()}
     except Exception as e:
-        print("OpenAI Error:", e)
-        return "⚠️ Sorry, something went wrong. Please try again."
+        return {"error": f"OpenAI error: {str(e)}"}
