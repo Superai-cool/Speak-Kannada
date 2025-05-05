@@ -2,92 +2,110 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Dashboard | Speak Kannada</title>
+  <title>Speak Kannada – Learn with AI</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    * {
-      font-family: 'Segoe UI', sans-serif;
-      box-sizing: border-box;
-    }
     body {
-      background-color: #f5f7fa;
+      background-color: #f9fafb;
+      font-family: 'Poppins', sans-serif;
     }
-    .reply-box {
-      background: #fff;
-      padding: 15px;
-      border-left: 4px solid #6366f1;
-      border-radius: 10px;
-      margin-top: 20px;
+    .message-box {
+      background-color: #e0f2fe;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+    .loading {
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      border: 3px solid #999;
+      border-top: 3px solid transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-left: 12px;
+    }
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
     }
   </style>
 </head>
-<body>
-  <div class="bg-indigo-700 text-white px-6 py-4 flex justify-between items-center">
-    <div class="text-lg font-bold">🗣️ Speak Kannada – Learn with AI</div>
-    <div>
-      {{ name }} | Credit: {{ credit }}
-      <a href="/logout" class="ml-4 underline">Logout</a>
-    </div>
+<body class="text-gray-800">
+  <div class="bg-blue-900 text-white py-4 px-6 flex justify-between items-center">
+    <div class="text-xl font-semibold">🧑‍🏫 Speak Kannada – Learn with AI</div>
+    <div class="text-sm"> {{ name }} | Credit: {{ credits }} <a href="/logout" class="ml-4 underline">Logout</a></div>
   </div>
 
-  <div class="max-w-3xl mx-auto p-6">
-    <!-- App Intro -->
-    <div class="bg-yellow-100 p-4 rounded-lg text-gray-800 text-sm mb-4">
-      👋 Welcome to Speak Kannada! This app helps you translate daily English questions into Kannada with proper pronunciation and usage examples. Ask in English and get your answer instantly.
+  <div class="max-w-4xl mx-auto mt-6 px-4">
+    <div class="bg-yellow-100 text-yellow-900 p-4 rounded-lg mb-4">
+      <strong>📢 Welcome to Speak Kannada!</strong><br>
+      Ask your question in English to get Kannada translation, pronunciation, and example usage instantly.
     </div>
 
-    <!-- Chat Display -->
-    <div id="chat-box"></div>
+    <div class="bg-white p-4 rounded shadow mb-4">
+      <p class="mb-2">Hi {{ name }}, ask me how to say anything in Kannada 😊</p>
+      <input id="userInput" class="w-full border p-2 rounded" placeholder="e.g. How to say I am hungry?" />
+      <button onclick="sendQuery()" class="mt-3 bg-blue-800 hover:bg-blue-700 text-white px-4 py-2 rounded">Send</button>
+    </div>
 
-    <!-- User Input Form -->
-    <form id="chat-form" class="mt-6">
-      <input type="text" id="user-input" name="user_input" placeholder="Type your question in English..." class="w-full p-3 border rounded-lg" required />
-      <button type="submit" class="mt-2 px-5 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Send</button>
-    </form>
+    <div id="chatBox" class="space-y-4"></div>
   </div>
 
   <script>
-    const form = document.getElementById('chat-form');
-    const input = document.getElementById('user-input');
-    const chatBox = document.getElementById('chat-box');
+    async function sendQuery() {
+      const input = document.getElementById("userInput").value.trim();
+      const chatBox = document.getElementById("chatBox");
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const question = input.value.trim();
-      if (!question) return;
+      if (!input) return;
 
-      // English check (basic)
-      if (!/^[A-Za-z0-9.,?'\"\\s]+$/.test(question)) {
+      if (!/^[a-zA-Z0-9\s?.,!']+$/.test(input)) {
         alert("❌ Please ask your question in English only.");
         return;
       }
 
-      const userHtml = `<div class='text-right my-3'><div class='inline-block bg-blue-100 text-gray-800 px-4 py-2 rounded-xl'>${question}</div></div>`;
-      chatBox.insertAdjacentHTML('beforeend', userHtml);
-      input.value = '';
+      const userDiv = document.createElement("div");
+      userDiv.className = "message-box";
+      userDiv.innerText = input;
+      chatBox.appendChild(userDiv);
 
-      const loader = document.createElement('div');
-      loader.className = 'reply-box';
-      loader.innerHTML = '⏳ Generating response...';
-      chatBox.appendChild(loader);
+      const loading = document.createElement("div");
+      loading.innerHTML = '<div class="loading"></div>';
+      chatBox.appendChild(loading);
 
-      const res = await fetch('/ask', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_input: question })
+      document.getElementById("userInput").value = "";
+
+      const res = await fetch("/get_kannada", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ query: input })
       });
 
       const data = await res.json();
-      loader.remove();
+      loading.remove();
 
-      if (res.status !== 200) {
-        chatBox.insertAdjacentHTML('beforeend', `<div class='reply-box text-red-600'>${data.error || 'Something went wrong.'}</div>`);
+      if (data.error) {
+        const err = document.createElement("div");
+        err.className = "text-red-600";
+        err.innerText = "❌ " + data.error;
+        chatBox.appendChild(err);
         return;
       }
 
-      chatBox.insertAdjacentHTML('beforeend', `<div class='reply-box'>${data.response}</div>`);
-    });
+      const reply = document.createElement("div");
+      reply.className = "bg-white border-l-4 border-green-600 p-4 rounded shadow";
+      reply.innerHTML = `
+        <p><b>🈯 Kannada Translation</b> – ${data.kannada}</p>
+        <p><b>🔁 Transliteration</b> – ${data.transliteration}</p>
+        <p><b>💬 Meaning / Context</b> – ${data.meaning}</p>
+        <p><b>✍️ Example Sentence</b> – ${data.example}</p>
+      `;
+      chatBox.appendChild(reply);
+    }
   </script>
 </body>
 </html>
