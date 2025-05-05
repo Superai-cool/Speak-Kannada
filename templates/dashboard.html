@@ -134,8 +134,13 @@
       chatBox.appendChild(botMsg);
       chatBox.scrollTop = chatBox.scrollHeight;
 
-      // Reload to update credit
-      setTimeout(() => location.reload(), 600);
+      // ✅ Update credit count directly in navbar
+      const creditText = document.querySelector("header span:nth-child(2)");
+      let match = creditText.textContent.match(/Credit:\s*(\d+)/);
+      if (match) {
+        let newCredit = parseInt(match[1]) - 1;
+        creditText.innerHTML = creditText.innerHTML.replace(/Credit:\s*\d+/, `Credit: ${newCredit}`);
+      }
     });
 
     input.value = "";
