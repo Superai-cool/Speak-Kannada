@@ -1,5 +1,5 @@
-flask
-firebase-admin
-python-dotenv
-openai==0.28
-gunicorn
+Flask==2.3.2
+firebase-admin==6.2.0
+gunicorn==20.1.0
+openai==0.28.1
+python-dotenv==1.0.0
