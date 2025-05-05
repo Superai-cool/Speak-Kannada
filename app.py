@@ -21,7 +21,7 @@ def login():
             session["mobile"] = mobile
             return redirect("/dashboard")
         else:
-            return render_template("login.html", error="Invalid login credentials.")
+            return render_template("login.html", error="Invalid mobile number or password.")
     return render_template("login.html")
 
 @app.route("/dashboard")
@@ -37,7 +37,7 @@ def dashboard():
 def ask():
     if "user" not in session:
         return "Session expired. Please log in again."
-    
+
     message = request.form["message"]
     mobile = session.get("mobile")
     user_ref = db.reference(f"users/{mobile}")
@@ -47,11 +47,12 @@ def ask():
     if credit <= 0:
         return "<strong>Insufficient credits.</strong> Please contact admin."
 
-    # Generate response from OpenAI
+    # Get AI response
     response = get_kannada_response(message)
 
-    # Deduct 1 credit per question
-    user_ref.update({"credit": credit - 1})
+    # Deduct credit only if OpenAI response succeeded
+    if not response.startswith("<strong>Error"):
+        user_ref.update({"credit": credit - 1})
 
     return response
 
