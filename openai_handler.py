@@ -1,7 +1,6 @@
 import openai
 import os
 
-# Set your API key from environment variable
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def get_kannada_response(user_input):
@@ -25,12 +24,12 @@ User Input: {user_input}
 """
 
     try:
-        response = openai.ChatCompletion.create(
+        response = openai.chat.completions.create(
             model="gpt-4",
             messages=[
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=500,
+            max_tokens=600,
             temperature=0.7
         )
         return response.choices[0].message.content.strip()
