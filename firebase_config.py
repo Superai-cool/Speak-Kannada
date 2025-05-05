@@ -1,16 +1,17 @@
+import os
+import json
 import firebase_admin
 from firebase_admin import credentials, db
-import json
-import os
 
-# Load Firebase Admin credentials from environment variable (JSON string)
-firebase_json = os.getenv("FIREBASE_JSON")
-firebase_db_url = os.getenv("FIREBASE_DB_URL")
+# Load JSON from environment variable
+firebase_json = os.environ.get("FIREBASE_JSON")
+if not firebase_json:
+    raise ValueError("FIREBASE_JSON not found in environment variables")
 
-# Parse JSON and initialize app
-cred = credentials.Certificate(json.loads(firebase_json))
+# Parse the JSON and initialize Firebase
+cred_dict = json.loads(firebase_json)
+cred = credentials.Certificate(cred_dict)
 
-if not firebase_admin._apps:
-    firebase_admin.initialize_app(cred, {
-        'databaseURL': firebase_db_url
-    })
+firebase_admin.initialize_app(cred, {
+    'databaseURL': os.environ.get("FIREBASE_DB_URL")
+})
