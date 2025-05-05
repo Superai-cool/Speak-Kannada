@@ -1,28 +1,70 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Admin Panel - Speak Kannada</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body {
-      background-color: #f3f4f6;
-      font-family: 'Segoe UI', sans-serif;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>Admin Panel - Speak Kannada</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #f4f7ff;
+        }
+        .title-bar {
+            background: #1e3a8a;
+            color: white;
+            padding: 1rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+            text-align: center;
+        }
+        .card {
+            background: white;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        label {
+            font-weight: 500;
+        }
+    </style>
 </head>
-<body class="p-6">
-  <div class="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-lg">
-    <h1 class="text-2xl font-bold text-indigo-600 mb-4">👨‍💼 Admin Panel - Speak Kannada</h1>
+<body class="p-4">
 
-    <p class="mb-2">🧾 Add, edit, or delete users via Firebase Console directly.</p>
-    <p class="mb-2">📊 Realtime DB Path: <code class="bg-gray-100 px-2 py-1 rounded">users/&lt;mobile&gt;</code></p>
+    <div class="title-bar">👨‍💼 Admin Panel – Speak Kannada</div>
 
-    <div class="mt-4">
-      <a href="/dashboard" class="inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">Go to Dashboard</a>
-      <a href="/logout" class="inline-block bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-600 transition ml-2">Logout</a>
+    <div class="max-w-3xl mx-auto mt-6">
+        <h2 class="text-xl font-semibold mb-4">📋 All Users</h2>
+
+        {% for user in users %}
+        <div class="card">
+            <form method="POST" action="/update_user" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <input type="hidden" name="mobile" value="{{ user.mobile }}">
+                
+                <div>
+                    <label>Name</label>
+                    <input type="text" name="name" value="{{ user.name }}" class="w-full border p-2 rounded">
+                </div>
+                <div>
+                    <label>Password</label>
+                    <input type="text" name="password" value="{{ user.password }}" class="w-full border p-2 rounded">
+                </div>
+                <div>
+                    <label>Credits</label>
+                    <input type="number" name="credits" value="{{ user.credits }}" class="w-full border p-2 rounded">
+                </div>
+                <div class="flex space-x-2">
+                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">Save</button>
+            </form>
+            <form method="POST" action="/delete_user" onsubmit="return confirm('Are you sure?')">
+                <input type="hidden" name="mobile" value="{{ user.mobile }}">
+                    <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">Delete</button>
+            </form>
+                </div>
+        </div>
+        {% endfor %}
     </div>
-  </div>
 </body>
 </html>
