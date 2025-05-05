@@ -2,3 +2,4 @@ flask
 firebase-admin
 python-dotenv
 openai>=1.0.0
+gunicorn
