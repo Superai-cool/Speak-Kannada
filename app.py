@@ -50,8 +50,8 @@ def ask():
     # Get AI response
     response = get_kannada_response(message)
 
-    # Deduct credit only if OpenAI response succeeded
-    if not response.startswith("<strong>Error"):
+    # Deduct credit only if valid AI response
+    if response and not response.startswith("<strong>Error") and "Kannada Translation" in response:
         user_ref.update({"credit": credit - 1})
 
     return response
