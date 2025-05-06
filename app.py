@@ -1,120 +1,87 @@
-from flask import Flask, render_template, request, session, redirect, url_for
-from firebase_config import db
+from flask import Flask, render_template, request, redirect, session
+import firebase_admin
+from firebase_admin import credentials, db
 from openai_handler import generate_kannada_translation
 import os
-
 from dotenv import load_dotenv
+
 load_dotenv()
 
+cred = credentials.Certificate(eval(os.environ.get("FIREBASE_JSON")))
+firebase_admin.initialize_app(cred, {
+    'databaseURL': os.environ.get("FIREBASE_DB_URL")
+})
+
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'default_secret_key')
+app.secret_key = os.environ.get("SECRET_KEY")
 
-ADMIN_NUMBER = '8830720742'
 
-@app.route('/')
+@app.route("/", methods=["GET"])
 def index():
-    return render_template('index.html')
+    return render_template("login.html")
 
-@app.route('/login', methods=['GET', 'POST'])
+
+@app.route("/login", methods=["GET", "POST"])
 def login():
-    if request.method == 'POST':
-        mobile = request.form['mobile']
-        password = request.form['password']
+    if request.method == "POST":
+        mobile = request.form["mobile"]
+        password = request.form["password"]
+        ref = db.reference("users").child(mobile).get()
 
-        user_ref = db.child("users").child(mobile).get()
-        if user_ref.val() and user_ref.val().get("password") == password:
-            session['mobile'] = mobile
-            session['name'] = user_ref.val().get("name", "User")
-            session['credits'] = user_ref.val().get("credits", 0)
+        if ref and ref["password"] == password:
+            session["mobile"] = mobile
+            session["name"] = ref["name"]
+            session["credits"] = ref["credit"]
+            session["messages"] = []
 
-            if mobile == ADMIN_NUMBER:
-                return redirect('/admin')
-
-            return redirect('/dashboard')
+            if mobile == "8830720742":
+                return redirect("/admin")
+            return redirect("/dashboard")
         else:
-            return render_template('login.html', error="Invalid credentials.")
-    return render_template('login.html')
+            return render_template("login.html", error="Invalid credentials")
+    return redirect("/")
 
-@app.route('/dashboard', methods=['GET', 'POST'])
+
+@app.route("/dashboard", methods=["GET", "POST"])
 def dashboard():
-    if 'mobile' not in session:
-        return redirect('/login')
+    if "mobile" not in session:
+        return redirect("/")
 
-    return render_template('dashboard.html', name=session.get("name"), credits=session.get("credits"))
+    messages = session.get("messages", [])
 
-@app.route('/translate', methods=['POST'])
-def translate():
-    if 'mobile' not in session:
-        return redirect('/login')
+    if request.method == "POST":
+        user_input = request.form["user_input"].strip()
+        if not user_input.replace(" ", "").isascii():
+            return render_template("dashboard.html", name=session["name"], credits=session["credits"], messages=messages, error="Please ask your question in English only.")
 
-    user_input = request.form['user_input']
+        try:
+            result = generate_kannada_translation(user_input)
+            # Deduct 1 credit
+            mobile = session["mobile"]
+            session["credits"] -= 1
+            db.reference("users").child(mobile).update({"credit": session["credits"]})
 
-    if not user_input.strip() or not user_input.replace(' ', '').isascii():
-        return {"error": "Please ask your question in English only."}
+            messages.append({"user": user_input, "bot": result})
+            session["messages"] = messages
+        except Exception as e:
+            return render_template("dashboard.html", name=session["name"], credits=session["credits"], messages=messages, error="Something went wrong. Try again!")
 
-    credits = int(session.get("credits", 0))
-    if credits <= 0:
-        return {"error": "No credits left."}
+    return render_template("dashboard.html", name=session["name"], credits=session["credits"], messages=messages)
 
-    result = generate_kannada_translation(user_input)
 
-    # Deduct credit
-    mobile = session['mobile']
-    credits -= 1
-    session['credits'] = credits
-    db.child("users").child(mobile).update({"credits": credits})
-
-    return result
-
-@app.route('/admin', methods=['GET', 'POST'])
+@app.route("/admin")
 def admin():
-    if 'mobile' not in session or session['mobile'] != ADMIN_NUMBER:
-        return redirect('/login')
+    if session.get("mobile") == "8830720742":
+        all_users = db.reference("users").get()
+        return render_template("admin.html", users=all_users)
+    return redirect("/")
 
-    users = db.child("users").get()
-    user_list = []
-    if users.each():
-        for user in users.each():
-            user_data = user.val()
-            user_list.append({
-                "mobile": user.key(),
-                "name": user_data.get("name", ""),
-                "credits": user_data.get("credits", 0),
-                "password": user_data.get("password", "")
-            })
 
-    return render_template("admin.html", users=user_list)
-
-@app.route('/update_user', methods=['POST'])
-def update_user():
-    if session.get('mobile') != ADMIN_NUMBER:
-        return redirect('/login')
-
-    mobile = request.form['mobile']
-    name = request.form['name']
-    password = request.form['password']
-    credits = request.form['credits']
-
-    db.child("users").child(mobile).update({
-        "name": name,
-        "password": password,
-        "credits": int(credits)
-    })
-    return redirect('/admin')
-
-@app.route('/delete_user', methods=['POST'])
-def delete_user():
-    if session.get('mobile') != ADMIN_NUMBER:
-        return redirect('/login')
-
-    mobile = request.form['mobile']
-    db.child("users").child(mobile).remove()
-    return redirect('/admin')
-
-@app.route('/logout')
+@app.route("/logout")
 def logout():
     session.clear()
-    return redirect('/login')
+    return redirect("/")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     app.run(debug=True)
