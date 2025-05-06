@@ -3,32 +3,29 @@ import os
 
 openai.api_key = os.environ.get("OPENAI_API_KEY")
 
-def generate_kannada_translation(question):
-    prompt = f"""
-You are an AI assistant helping users learn Kannada.
+def get_kannada_translation(user_input):
+    prompt = f"""You are a helpful AI assistant helping users learn conversational Kannada.
 
-When a user asks how to say something in Kannada, reply in the following Markdown format:
+Translate the following user query to Kannada with:
+1. Kannada Translation
+2. Transliteration (Kannada in English letters)
+3. Meaning / Context in English
+4. Example sentence in Kannada + Transliteration
 
-📝 **Kannada Translation** – [Kannada Script] (transliteration in brackets)
+Input: {user_input}
+Only return formatted output like this:
 
-🔤 **Transliteration** – [write it using English letters]
-
-💬 **Meaning / Context** – A short English explanation of the sentence's meaning
-
-📚 **Example Sentence** – [Show a Kannada sentence with usage] (Transliteration in brackets)
-
-User asked: "{question}"
-Please generate all output in the above format clearly and accurately.
+📌 Kannada Translation – ...
+🔤 Transliteration – ...
+💬 Meaning / Context – ...
+✍️ Example Sentence – ...
 """
 
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
-            max_tokens=400
-        )
-        answer = response["choices"][0]["message"]["content"]
-        return {"answer": answer}
-    except Exception as e:
-        return {"error": str(e)}
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.7
+    )
+
+    reply = response["choices"][0]["message"]["content"]
+    return reply
