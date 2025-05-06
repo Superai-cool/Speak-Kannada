@@ -3,24 +3,18 @@ import json
 import firebase_admin
 from firebase_admin import credentials, db, auth
 
-# Get the stringified JSON from the FIREBASE_KEY_JSON env variable
-firebase_json = os.environ.get("FIREBASE_KEY_JSON")
+firebase_json = os.getenv("FIREBASE_KEY_JSON")
+firebase_db_url = os.getenv("FIREBASE_DB_URL")
 
 if not firebase_json:
-    raise ValueError("❌ FIREBASE_KEY_JSON is missing in environment variables.")
+    raise Exception("FIREBASE_KEY_JSON is not set or empty.")
 
-try:
-    cred_dict = json.loads(firebase_json)
-except json.JSONDecodeError as e:
-    raise ValueError("❌ FIREBASE_KEY_JSON is not valid JSON: " + str(e))
-
+cred_dict = json.loads(firebase_json)
 cred = credentials.Certificate(cred_dict)
 
-# Initialize Firebase Admin SDK
 firebase_admin.initialize_app(cred, {
-    'databaseURL': os.environ.get("FIREBASE_DB_URL")
+    'databaseURL': firebase_db_url
 })
 
-# Export objects for use
 firebase_auth = auth
 firebase_db = db
