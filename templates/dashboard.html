@@ -1,87 +1,95 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Speak Kannada – Learn with AI</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
-  <style>
-    body {
-      font-family: 'Poppins', sans-serif;
-      background-color: #f9fafb;
-    }
-    .message-box {
-      max-width: 80%;
-      padding: 12px 18px;
-      margin: 10px 0;
-      border-radius: 12px;
-    }
-    .user-msg {
-      background: #e0f2fe;
-      align-self: flex-end;
-    }
-    .bot-msg {
-      background: #fef9c3;
-      align-self: flex-start;
-    }
-    #loading {
-      display: none;
-    }
-    .blinker {
-      font-weight: bold;
-      font-size: 18px;
-      color: #6366f1;
-      animation: blink 1s linear infinite;
-    }
-    @keyframes blink {
-      50% { opacity: 0.4; }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>Speak Kannada – Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * {
+            font-family: 'Segoe UI', sans-serif;
+        }
+        .bot-msg {
+            background-color: #f1f5f9;
+            border-left: 4px solid #4f46e5;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .user-msg {
+            background-color: #e0f2fe;
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            align-self: flex-end;
+            text-align: right;
+            max-width: 80%;
+        }
+        .message-box {
+            display: flex;
+            flex-direction: column;
+        }
+    </style>
 </head>
-<body class="p-4">
-
-  <div class="bg-blue-900 text-white text-lg font-semibold p-4 rounded-md flex justify-between items-center">
-    <div>🗣️ Speak Kannada – Learn with AI</div>
-    <div>
-      {{ name }} | Credit: {{ credits }} 
-      &nbsp; <a href="/logout" class="underline ml-2">Logout</a>
+<body class="bg-gray-100 min-h-screen">
+    <div class="bg-indigo-800 text-white py-4 px-6 flex justify-between items-center">
+        <h1 class="text-lg font-semibold">🗣️ Speak Kannada – Learn with AI</h1>
+        <div>
+            {{ name }} | Credit: {{ credits }}
+            &nbsp;&nbsp;
+            <a href="/logout" class="underline">Logout</a>
+        </div>
     </div>
-  </div>
 
-  <div class="mt-4 bg-yellow-100 text-yellow-900 text-sm rounded-lg p-3 shadow-sm">
-    <b>📢 Welcome to Speak Kannada!</b> You can ask how to say anything in Kannada with proper pronunciation and examples. Just type your question in English and hit send.
-  </div>
+    <div class="max-w-3xl mx-auto mt-6">
+        <div id="introBox" class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-900 p-4 rounded mb-6">
+            <p>👋 <strong>Welcome to Speak Kannada!</strong> This app helps you learn Kannada with proper pronunciation and examples. Just ask how to say anything in English – and get the Kannada translation, transliteration, and a sample sentence instantly!</p>
+        </div>
 
-  <div class="flex flex-col mt-4 space-y-2" id="chatbox">
-    <div class="bot-msg message-box">
-      Hi {{ name }}, ask me how to say anything in Kannada 😊
+        <div id="chatBox" class="flex flex-col space-y-4 mb-6">
+            <div class="bot-msg">Hi {{ name }}, ask me how to say anything in Kannada 😊</div>
+            {% for pair in conversation %}
+                <div class="user-msg">{{ pair['question'] }}</div>
+                <div class="bot-msg">{{ pair['response']|safe }}</div>
+            {% endfor %}
+        </div>
+
+        <!-- Loader (hidden by default) -->
+        <div id="loader" class="hidden text-center mb-4">
+            <div class="flex items-center justify-center space-x-2 text-sm text-gray-500">
+                <div class="w-3 h-3 bg-indigo-500 rounded-full animate-bounce"></div>
+                <div class="w-3 h-3 bg-indigo-500 rounded-full animate-bounce [animation-delay:.2s]"></div>
+                <div class="w-3 h-3 bg-indigo-500 rounded-full animate-bounce [animation-delay:.4s]"></div>
+                <span>Translating...</span>
+            </div>
+        </div>
+
+        <form id="chatForm" method="POST" action="/dashboard">
+            <div class="flex">
+                <input type="text" name="question" id="questionInput" placeholder="Type your question here..." required class="w-full p-3 rounded-l border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <button type="submit" class="bg-indigo-600 text-white px-5 py-3 rounded-r hover:bg-indigo-700">Send</button>
+            </div>
+        </form>
     </div>
-    {% for m in messages %}
-      <div class="user-msg message-box">{{ m['user'] }}</div>
-      <div class="bot-msg message-box">{{ m['bot'] | safe }}</div>
-    {% endfor %}
-  </div>
 
-  <div id="loading" class="text-center mt-4 blinker">⏳ Thinking in Kannada...</div>
+    <script>
+        // Show loader when form is submitted
+        const form = document.getElementById("chatForm");
+        const loader = document.getElementById("loader");
+        const input = document.getElementById("questionInput");
 
-  <form method="POST" class="mt-4 flex items-center space-x-2" onsubmit="return showLoading()">
-    <input type="text" name="user_input" id="user_input" placeholder="Type your question here..." class="flex-1 border border-gray-300 p-3 rounded shadow-sm" required>
-    <button type="submit" class="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700">Send</button>
-  </form>
+        form.addEventListener("submit", function(e) {
+            const value = input.value.trim();
+            const onlyEnglishRegex = /^[A-Za-z0-9\s?.,'";:-]+$/;
 
-  <script>
-    function showLoading() {
-      const input = document.getElementById("user_input").value;
-      const isEnglish = /^[A-Za-z0-9\s?'"!.,]+$/.test(input);
-      if (!isEnglish) {
-        alert("❌ Please ask your question in English only.");
-        return false;
-      }
-      document.getElementById("loading").style.display = "block";
-      return true;
-    }
-  </script>
+            if (!onlyEnglishRegex.test(value)) {
+                e.preventDefault();
+                alert("❌ Please ask your question in English only.");
+                return;
+            }
 
+            loader.classList.remove("hidden");
+        });
+    </script>
 </body>
 </html>
