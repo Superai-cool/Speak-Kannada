@@ -1,69 +1,124 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, session, jsonify
 from firebase_config import firebase_auth, firebase_db
 from openai_handler import generate_kannada_translation
+from datetime import timedelta
 import os
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY")
+app.secret_key = "secret-key"
+app.permanent_session_lifetime = timedelta(days=1)
 
-admin_number = "8830720742"
+ADMIN_NUMBERS = ["9876543210", "8830720742"]
 
-@app.route("/")
+@app.route('/')
 def home():
-    return redirect(url_for("login"))
+    return redirect('/login')
 
-@app.route("/login", methods=["GET", "POST"])
+@app.route('/login', methods=['GET', 'POST'])
 def login():
-    if request.method == "POST":
-        mobile = request.form["mobile"]
-        password = request.form["password"]
-        users = firebase_db.child("users").get().val()
-        if users and mobile in users and users[mobile]["password"] == password:
-            session["mobile"] = mobile
-            session["name"] = users[mobile]["name"]
-            session["credits"] = users[mobile]["credits"]
-            if mobile == admin_number:
-                return redirect("/admin")
-            return redirect("/dashboard")
+    if request.method == 'POST':
+        mobile = request.form['mobile']
+        password = request.form['password']
+
+        user_ref = firebase_db.reference(f'users/{mobile}')
+        user = user_ref.get()
+
+        if user and user['password'] == password:
+            session['mobile'] = mobile
+            session['name'] = user['name']
+            session['credits'] = user['credit']
+            return redirect('/dashboard')
         else:
-            return render_template("login.html", error="Invalid mobile or password")
+            return "Invalid credentials", 401
+
     return render_template("login.html")
 
-@app.route("/dashboard", methods=["GET", "POST"])
+@app.route('/dashboard', methods=['GET'])
 def dashboard():
-    if "mobile" not in session:
-        return redirect("/login")
+    if 'mobile' not in session:
+        return redirect('/login')
 
-    if request.method == "POST":
-        question = request.form["question"]
-        if not question.replace(" ", "").isalpha():
-            return render_template("dashboard.html", name=session["name"], credits=session["credits"],
-                                   error="Please ask your question in English only.")
+    name = session.get('name')
+    credits = session.get('credits')
+    intro_message = "👋 Welcome to Speak Kannada – Your personal AI assistant to learn Kannada with proper pronunciation and examples. Ask how to say anything in Kannada!"
 
-        if session["credits"] <= 0:
-            return render_template("dashboard.html", name=session["name"], credits=session["credits"],
-                                   error="No credits left.")
+    return render_template("dashboard.html", name=name, credits=credits, intro_message=intro_message)
 
-        response = generate_kannada_translation(question)
-        session["credits"] -= 1
-        firebase_db.child("users").child(session["mobile"]).update({"credits": session["credits"]})
-        return render_template("dashboard.html", name=session["name"], credits=session["credits"],
-                               question=question, response=response)
+@app.route('/translate', methods=['POST'])
+def translate():
+    if 'mobile' not in session:
+        return jsonify({'error': 'Not logged in'}), 401
 
-    return render_template("dashboard.html", name=session["name"], credits=session["credits"])
+    user_input = request.json.get('message', '')
 
-@app.route("/admin", methods=["GET", "POST"])
-def admin():
-    if "mobile" not in session or session["mobile"] != admin_number:
-        return redirect("/login")
+    if not user_input.strip():
+        return jsonify({'error': 'Empty message'}), 400
 
-    users = firebase_db.child("users").get().val()
-    return render_template("admin.html", users=users)
+    # English-only check
+    if not all(ord(c) < 128 for c in user_input):
+        return jsonify({'error': 'Please ask your question in English only.'}), 400
 
-@app.route("/logout")
+    mobile = session['mobile']
+    user_ref = firebase_db.reference(f'users/{mobile}')
+    user_data = user_ref.get()
+
+    credits = int(user_data.get('credit', 0))
+    if credits <= 0:
+        return jsonify({'error': 'You are out of credits. Please contact admin.'}), 402
+
+    # Generate response
+    response = generate_kannada_translation(user_input)
+
+    # Deduct credit
+    new_credits = credits - 1
+    user_ref.update({'credit': new_credits})
+    session['credits'] = new_credits
+
+    return jsonify({
+        'response': response,
+        'remaining_credits': new_credits
+    })
+
+@app.route('/logout')
 def logout():
     session.clear()
-    return redirect("/login")
+    return redirect('/login')
+
+@app.route('/admin', methods=['GET'])
+def admin_panel():
+    if 'mobile' not in session or session['mobile'] not in ADMIN_NUMBERS:
+        return "Unauthorized", 403
+
+    users_ref = firebase_db.reference('users')
+    users = users_ref.get() or {}
+
+    return render_template("admin.html", users=users)
+
+@app.route('/update_user', methods=['POST'])
+def update_user():
+    if 'mobile' not in session or session['mobile'] not in ADMIN_NUMBERS:
+        return "Unauthorized", 403
+
+    data = request.form
+    mobile = data['mobile']
+
+    user_ref = firebase_db.reference(f'users/{mobile}')
+    user_ref.update({
+        'name': data.get('name'),
+        'password': data.get('password'),
+        'credit': int(data.get('credit', 0))
+    })
+
+    return redirect('/admin')
+
+@app.route('/delete_user', methods=['POST'])
+def delete_user():
+    if 'mobile' not in session or session['mobile'] not in ADMIN_NUMBERS:
+        return "Unauthorized", 403
+
+    mobile = request.form['mobile']
+    firebase_db.reference(f'users/{mobile}').delete()
+    return redirect('/admin')
 
 if __name__ == "__main__":
     app.run(debug=True)
