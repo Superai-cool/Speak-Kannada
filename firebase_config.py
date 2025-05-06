@@ -1,14 +1,23 @@
+import os
+import json
 import firebase_admin
 from firebase_admin import credentials, auth, db
-import os
 
-# Make sure the path is either hardcoded correctly or fetched from environment
-FIREBASE_KEY_PATH = os.environ.get("FIREBASE_KEY_PATH", "firebase-key.json")
+# Load Firebase credentials from environment variable
+firebase_key_json = os.getenv("FIREBASE_KEY_JSON")
 
-cred = credentials.Certificate(FIREBASE_KEY_PATH)
-firebase_admin.initialize_app(cred, {
-    'databaseURL': 'https://speak-kannada-4cd25-default-rtdb.asia-southeast1.firebasedatabase.app/users'  # ✅ update this with your actual Firebase DB URL
-})
+if firebase_key_json and firebase_key_json.startswith('{'):
+    firebase_key_dict = json.loads(firebase_key_json)
+    cred = credentials.Certificate(firebase_key_dict)
+else:
+    # Fallback for local development
+    cred = credentials.Certificate("firebase-key.json")
+
+# Initialize Firebase app
+if not firebase_admin._apps:
+    firebase_admin.initialize_app(cred, {
+        'databaseURL': os.getenv("FIREBASE_DATABASE_URL")  # also set this in Railway
+    })
 
 firebase_auth = auth
 firebase_db = db
