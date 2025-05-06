@@ -1,19 +1,22 @@
+import os
 import json
 import firebase_admin
 from firebase_admin import credentials, db
-import os
 
-firebase_json = os.getenv("FIREBASE_KEY_JSON")
+# Load Firebase credentials from environment variable
+firebase_key_json = os.getenv("FIREBASE_KEY_JSON")
 
-if not firebase_json:
-    raise ValueError("FIREBASE_KEY_JSON environment variable is missing.")
+if not firebase_key_json:
+    raise ValueError("FIREBASE_KEY_JSON env variable is missing.")
 
-firebase_dict = json.loads(firebase_json)
-cred = credentials.Certificate(firebase_dict)
+# Convert stringified JSON into a dictionary
+firebase_creds_dict = json.loads(firebase_key_json)
+cred = credentials.Certificate(firebase_creds_dict)
 
+# Initialize Firebase
 firebase_admin.initialize_app(cred, {
     'databaseURL': os.getenv("FIREBASE_DB_URL")
 })
 
-firebase_auth = firebase_admin.auth
-firebase_db = db
+# Export the DB reference
+firebase_db = db.reference()
